@@ -30,7 +30,7 @@ class LRUCache(Cache):
 
         # prefetch settings
         self.pf = pf
-        self.pf_n = pf.aggressiveness
+        # self.pf_n = pf.aggressiveness
         self.pf_buff = []       # prefetced data list
         self.pf_buff_slots = int(self.slots * 0.2)
         # print("prefetch buffer slots :", self.pf_buff_slots)
@@ -82,11 +82,54 @@ class LRUCache(Cache):
 
         lpn = addr // self.unit # 16KB 페이지 단위로 프리페치
         
+        # best offset
+        if self.pf.code == BO:
+            self.pf.learn(lpn)
+
+        # clstm
+        if self.pf.code == CLSTM:
+            pf_clstm = self.pf.prefetch(int(lpn))
+            for pd in pf_clstm:
+                pd = int(pd)
+                if pd not in self.pf_buff and pd not in self.dlist:
+                    self.pf_buff.append(pd)
+                if len(self.pf_buff) > self.pf_buff_slots:
+                    self.pf_buff.pop(0)
+        # read-ahead
+        if self.pf.code == RA:
+            # 저장된 마지막 접근 page가 없을 경우 
+            if self.pf.prev_page < 0:
+                self.pf.readahead_on = 1
+                self.pf.prev_page = lpn # 마지막 접근 page 저장
+
+            # 마지막으로 접근했던 page가 있을 경우
+            else:
+                # sequential access -> read-ahead on 상태.
+                # agressiveness 증가
+                # random->sequential인 경우
+                # agressiveness 4에서 시작
+                if lpn == self.pf.prev_page + 1:
+                    if self.pf.readahead_on:
+                        self.pf.aggressControl("seq")
+                    
+                    else:
+                        self.pf.readahead_on = 1
+                    
+                # random access -> read-ahead off
+                else:
+                    self.pf.readaheadOff()
+
         # hit
         if lpn in self.dlist:
             self.dlist.remove(lpn)
             self.dlist.insert(0, lpn) # MRU position: head
             self.hits += 1
+
+            if self.pf.code == RA:
+                self.pf.hit_counter += 1
+                # 연속해서 hit 256번 발생했을 때 read-ahead 끔
+                if self.pf.hit_counter == 256:
+                    self.pf.readaheadOff() 
         
         # miss
         else:
@@ -95,9 +138,17 @@ class LRUCache(Cache):
                 self.pf_buff.remove(lpn)
                 self.pf_hits += 1
             
+                if self.pf.code == RA:
+                    self.pf.hit_counter += 1
+                    # 연속해서 hit 256번 발생했을 때 read-ahead 끔
+                    if self.pf.hit_counter == 256:
+                        self.pf.readaheadOff()
+
             # # prefetch miss
-            # else:
-            #     pass
+            else:
+                if self.pf.code == RA:
+                    # dlist, pf_buff 모두 miss일 때 hit counter = 0
+                    self.pf.hit_counter = 0
 
             self.miss_lpn.append(lpn)
             # replacement
@@ -111,13 +162,26 @@ class LRUCache(Cache):
                 self.pf.history_insert(lpn)
                 self.pf.find_offset()
                 self.pf.set_aggressiveness(self.pf_hits)
+
+            if self.pf.code == RA:
+                self.pf.prev_page = lpn
             
-            pf_data = self.pf.prefetch(int(lpn))
+            if self.pf.code == CLSTM:
+                self.pf.leap.history_insert(lpn)
+                self.pf.leap.find_offset()
+                self.pf.leap.set_aggressiveness(self.pf_hits)
+                pf_data = self.pf.leap.prefetch(int(lpn))
+            else:
+                pf_data = self.pf.prefetch(int(lpn))
 
             for pd in pf_data:
                 if pd not in self.pf_buff and pd not in self.dlist:
                     self.pf_buff.append(pd)
                 if len(self.pf_buff) > self.pf_buff_slots:
                     self.pf_buff.pop(0) # FIFO
+
+                    # memory pressure 시, read-ahead 크기 조절
+                    if self.pf.code == RA:
+                        self.pf.aggressControl("mp")
 
         return

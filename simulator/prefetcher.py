@@ -1,5 +1,7 @@
 import math
+import pandas as pd
 from prefetcher_info import *
+from ast import literal_eval
 
 class NonePrefetcher:
     def __init__(self, n = 3):
@@ -126,8 +128,144 @@ class LeapPrefetcher:
             _lpn += self.granularity * self.prefetch_offset
         return fetched_data
 
-# class CLSTMPrefetcher:
-#     def __init__(self):
-#         self.code = CLSTM
+class CLSTMPrefetcher:
+    def __init__(self, file_path):
+        self.code = CLSTM
+        self.leap = LeapPrefetcher()
+        self.result = pd.read_csv(file_path)
+        self.result['pred'] = self.result['pred'].apply(self.str_to_list)
+        # print(self.result.index)
+        self.num = 0
 
-#     def prefetch(self, lpn: int):
+    def str_to_list(self, strlist):
+        return literal_eval(strlist)
+
+    def prefetch(self, lpn: int):
+        fetched_data = self.result['pred'][self.num]
+        self.num += 1
+        return fetched_data
+    
+class BestOffsetPrefetcher:
+    def __init__(self, k = 16):
+        self.code = BO
+        self.granularity = 1 # 64bytes
+        self.scoremax = 31
+        self.offset = [ 1,  2,  3,  4,  5,  6,  8,  9, 10, 12,
+                       15, 16, 18, 20, 24, 25, 27, 30, 32, 36,
+                       40, 45, 48, 50, 54, 60, 64, 72, 75, 80,
+                       81, 90, 96,100,108,120,125,128,135,144,
+                      150,160,162,180,192,200,216,225,240,243,
+                      250,256 ]
+        self.score = {}  # 각 offset 이 최근에 나왔는지 카운트하는 딕셔너리
+        self.badscore = 1
+
+        self.roundmax = 100
+
+        self.prefetch_offset = 1 # current prefetch offset 
+        self.rr = [] # recent request table 
+        self.rr_entries = 256
+
+        self.prefetch_on = 1
+        self.aggressiveness = 1
+        self.reset_phase()
+
+    def reset_phase(self):
+        for offset in self.offset:
+            self.score[offset] = 0
+        
+        self.rounds = 0
+        self.cursor = 0  # 현재 check 할 offset 의 인덱스 
+
+
+    # BO 프리페처는 매 메모리 접근 마다 offset 의 발생 유무를 탐색. 
+    def learn(self, lpn: int):
+        # offset 학습. lpn 로부터 특정 offset 만큼 떨어진 곳에 request 가 발생한 적이 있는지 카운트 
+        offset = self.offset[self.cursor]
+        self.cursor += 1 
+
+        # increase offset score 
+        prev_lpn = lpn - offset 
+        if prev_lpn in self.rr:
+            self.score[offset] += 1 
+
+        # print(self.score)
+        
+        if self.score[offset] == self.scoremax:
+            self.prefetch_on = 1
+            self.prefetch_offset = offset
+            # print("prefetch_offset with scoremax: ", self.prefetch_offset)
+            # print(self.score)
+            self.reset_phase()
+        
+        # Maintain recent 256 requests in rr table 
+        if lpn in self.rr:
+            self.rr.remove(lpn)       
+        self.rr.append(lpn)
+
+        if len(self.rr) > self.rr_entries:
+            self.rr.pop(0)
+
+        # round check
+
+        if self.cursor == len(self.offset):
+            self.cursor = 0
+
+            if self.rounds == self.roundmax:
+                # score 가장 높은 애 찾기 
+                maxscore = 0
+                
+                for offset in self.score:
+                    if maxscore < self.score[offset]:
+                        maxoffset = offset
+                
+                if maxscore > self.badscore:
+                    self.prefetch_on = 1
+                    self.prefetch_offset = maxoffset
+                    print("prefetch_offset with maxscore: ", self.prefetch_offset)
+                else:
+                    self.prefetch_on = 0
+
+                self.reset_phase()
+
+    def prefetch(self, lpn: int):
+        fetched_data = []
+
+        if self.prefetch_on:
+            _lpn = lpn + self.prefetch_offset
+            for n in range(1, self.aggressiveness+1):
+                fetched_data.append(_lpn)
+                _lpn += self.granularity
+
+        return fetched_data
+    
+class LinuxReadAhead:
+    def __init__(self, n = 1):
+        self.code = RA
+        self.aggressiveness = 4
+        self.readahead_on = 1
+        self.prev_page = -1 # 마지막으로 접근했던 lpn
+        self.hit_counter = 0 # hit counter
+
+    def readaheadOff(self):
+        self.readahead_on = 0
+        self.aggressiveness = 4
+
+    def aggressControl(self, cond: str):
+        if cond == "mp": # memory pressure
+            if self.aggressiveness >= 6:
+                self.aggressiveness -= 2
+            else:
+                self.aggressiveness = 4
+        
+        elif cond == "seq": # sequential access
+            if self.aggressiveness < 32:
+                self.aggressiveness *= 2
+
+    def prefetch(self, lpn: int):
+        fetched_data = []
+
+        if self.readahead_on:
+            for i in range(1, self.aggressiveness+1):
+                fetched_data.append(lpn+i)
+        
+        return fetched_data

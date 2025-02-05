@@ -5,13 +5,19 @@ import prefetcher as pf
 import sys
 import cache as cc
 
-def get_pf(choice):
+def get_pf(choice, conf):
     if choice == PF_NONE:
         prefetcher = pf.NonePrefetcher()
     elif choice == PF_NLINE:
         prefetcher = pf.NLinePrefetcher()
     elif choice == PF_LEAP:
         prefetcher = pf.LeapPrefetcher()
+    elif choice == PF_CLSTM:
+        prefetcher = pf.CLSTMPrefetcher(conf.clstm_result)
+    elif choice == PF_BO:
+        prefetcher = pf.BestOffsetPrefetcher()
+    elif choice == PF_RA:
+        prefetcher = pf.LinuxReadAhead()
     else:
         print("Wrong choice for prefetcher")
         sys.exit()
@@ -19,8 +25,6 @@ def get_pf(choice):
     return prefetcher
 
 def _cache_sim(cache):
-    choice = int(sys.argv[1])
-
     for f in cache.conf.files:
         filename = cache.conf.dir + f + "." + cache.conf.trc
         cache.reset()
@@ -45,7 +49,7 @@ def cache_sim():
     capacity = 1 << 21      # 2MB
     slots = capacity / conf.page_size
     
-    prefetcher = get_pf(choice)
+    prefetcher = get_pf(choice, conf)
     cache = cc.LRUCache(slots, conf.page_size, prefetcher, conf)
     _cache_sim(cache)
 

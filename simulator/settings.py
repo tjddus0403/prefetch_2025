@@ -3,10 +3,10 @@ class Settings:
         if obj is None:
             # 트레이스 설정
             self.dir = "./traces/paddr/bc/"
-            self.files = ["bc_3m"]
+            self.files = ["bc_1m_tail"]
             self.trc = "paddr"
             
-            self.clstm_result = ""
+            self.clstm_result = "../results/bc_test_result_addr.csv"
 
             # 단위 설정
             self.page_size = (1 << 14) # page size (16KB)
@@ -20,4 +20,4 @@ class Settings:
             
             self.page_size = obj.page_size
             self.line_size = obj.line_size
-            self.cluster_size = obj.cluster_size
+            self.cluster_size = obj.cluster_sifze
