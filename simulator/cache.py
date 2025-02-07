@@ -131,7 +131,6 @@ class LRUCache(Cache):
                     # dlist, pf_buff 모두 miss일 때 hit counter = 0
                     self.pf.hit_counter = 0
 
-            self.miss_lpn.append(lpn)
             # replacement
             if len(self.dlist) == self.slots:
                 evicted_lpn = self.dlist.pop(-1)
