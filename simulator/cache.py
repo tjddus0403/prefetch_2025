@@ -36,6 +36,10 @@ class LRUCache(Cache):
         # print("prefetch buffer slots :", self.pf_buff_slots)
         self.pf_hits = 0
 
+        # precision
+        self.total_pf = 0
+        self.pf_buf_evicted = 0
+
     def reset(self):
         self.hits = 0
         self.refs = 0
@@ -46,13 +50,22 @@ class LRUCache(Cache):
         self.pf_buff.clear()
         self.pf_hits = 0
 
+        # precision
+        self.total_pf = 0
+        self.pf_buf_evicted = 0
+
         # leap의 경우, 이전 기록을 가지고 있기 때문에 trace가 바뀔 때, 초기화 필요
         if self.pf.code == LEAP:
             self.pf.reset_()
 
     def stats(self):
-        stat = f"cache_size = {self.slots} \npf_buff_size = {self.pf_buff_slots} \ntotal_refs = {self.refs} \nhits = {self.hits} \npf_hits = {self.pf_hits} \nhit_ratio = {self.hits/self.refs} \nhit_ratio_pf = {(self.hits+self.pf_hits)/self.refs}"
+        stat = f"cache_size = {self.slots} \npf_buff_size = {self.pf_buff_slots} \ntotal_refs = {self.refs} \
+            \nhits = {self.hits} \npf_hits = {self.pf_hits} \nhit_ratio = {self.hits/self.refs} \
+            \nhit_ratio_pf = {(self.hits+self.pf_hits)/self.refs}"
         print(stat)
+        if self.pf.code != NONE:
+            precision = self.pf_buf_evicted/self.total_pf
+            print(f"precision = {precision:.4f}")
         return
     
     def access(self, addr):
@@ -70,12 +83,17 @@ class LRUCache(Cache):
         # clstm
         if self.pf.code == CLSTM:
             pf_clstm = self.pf.prefetch(int(lpn))
+            # precision
+            self.total_pf += len(pf_clstm)
             for pd in pf_clstm:
                 pd = int(pd)
                 if pd not in self.pf_buff and pd not in self.dlist:
                     self.pf_buff.append(pd)
                 if len(self.pf_buff) > self.pf_buff_slots:
                     self.pf_buff.pop(0)
+                    # precision
+                    self.pf_buf_evicted += 1
+
         # read-ahead
         if self.pf.code == RA:
             # 저장된 마지막 접근 page가 없을 경우 
@@ -132,7 +150,7 @@ class LRUCache(Cache):
                     self.pf.hit_counter = 0
 
             # replacement
-            if len(self.dlist) == self.slots:
+            if len(self.dlist) == self.slots :
                 evicted_lpn = self.dlist.pop(-1)
                 
             # insert accessed data into cache
@@ -151,17 +169,22 @@ class LRUCache(Cache):
                 self.pf.leap.find_offset()
                 self.pf.leap.set_aggressiveness(self.pf_hits)
                 pf_data = self.pf.leap.prefetch(int(lpn))
+
             else:
                 pf_data = self.pf.prefetch(int(lpn))
 
-            for pd in pf_data:
-                if pd not in self.pf_buff and pd not in self.dlist:
-                    self.pf_buff.append(pd)
-                if len(self.pf_buff) > self.pf_buff_slots:
-                    self.pf_buff.pop(0) # FIFO
+            if self.pf.code != NONE :
+                # precision
+                self.total_pf += len(pf_data)
+                for pd in pf_data:
+                    if pd not in self.pf_buff and pd not in self.dlist:
+                        self.pf_buff.append(pd)
+                    if len(self.pf_buff) > self.pf_buff_slots:
+                        self.pf_buff.pop(0) # FIFO
+                        self.pf_buf_evicted += 1
 
-                    # memory pressure 시, read-ahead 크기 조절
-                    if self.pf.code == RA:
-                        self.pf.aggressControl("mp")
+                        # memory pressure 시, read-ahead 크기 조절
+                        if self.pf.code == RA:
+                            self.pf.aggressControl("mp")
 
         return
