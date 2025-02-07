@@ -36,18 +36,6 @@ class LRUCache(Cache):
         # print("prefetch buffer slots :", self.pf_buff_slots)
         self.pf_hits = 0
 
-        # bitmap
-        self.bitmap = {}
-        self.touched_list = []
-
-        # distance
-        self.distance = []
-        self.pf_hit_distance = []
-        self.pf_miss_distance = []
-        self.miss_lpn = []
-        self.closest_rank = []
-        self.miss_closest_rank = []
-
     def reset(self):
         self.hits = 0
         self.refs = 0
@@ -57,13 +45,6 @@ class LRUCache(Cache):
         
         self.pf_buff.clear()
         self.pf_hits = 0
-
-        self.distance.clear()
-        self.pf_hit_distance.clear()
-        self.pf_miss_distance.clear()
-        self.miss_lpn.clear()
-        self.closest_rank.clear()
-        self.miss_closest_rank.clear()
 
         # leap의 경우, 이전 기록을 가지고 있기 때문에 trace가 바뀔 때, 초기화 필요
         if self.pf.code == LEAP:
