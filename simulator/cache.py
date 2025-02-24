@@ -1,5 +1,4 @@
 from abc import abstractmethod
-import bitarray
 import util as ut
 import sys
 from prefetcher_info import *
