@@ -5,7 +5,7 @@
 ```bash
 $ pip install -r requirements.txt
 ```
-
+***
 ### 📁 Traces
 0. Create directories for trace files
   ```bash
@@ -28,6 +28,7 @@ $ pip install -r requirements.txt
   ```bash
   $ ./split_data.sh
   ```
+***
 ### 🗂️ Data Collection (아직 미완성)
 Use the simulator to generate training data for the model
 
@@ -60,6 +61,7 @@ Use the simulator to generate training data for the model
   $ cd data
   $ python3 r2c.py
   ```
+***
 ### 📍 Model Training
 1. Set the trace name in _**setting.py** _
 - Open _**setting.py**_
@@ -69,18 +71,38 @@ Use the simulator to generate training data for the model
   ```
 2. Train the model
   ```bash
-  python3 train.py
+  $ python3 train.py
   ```
+***
 ### 📍 Model Prediction
 Use the trained cLSTM model to predict and extract result
 
 0. Create directories for model's prediction
   ```bash
-  $ mkdir -p results/clstm_leap
+  $ mkdir -p results/{clstm_leap,clstm_only,delta,seq_leap,seq_only}
   ```
 1. Run the test file to get the model's prediction
   ```bash
-  python3 test.py
+  $ python3 test.py
   ```
-### 📊 Simulator 
-
+***
+### 📊 Simulation
+1. Set the trace name, data collection flag in _**settings.py** _
+- Open _**simulator/settings.py**_
+- Set the TRACE variable to the trace file name you want to simulate
+- Set self.collect to True for data collection
+  ```python
+  self.collect = False # for simulation
+  TRACE = "astar" # Example
+  ```
+2. Use the **cLSTM Prefetcher** for simulation
+- Available prefetcher options are defined in _**simulator/prefetcher_info.py**_
+  ```bash
+  $ cd simulator
+  $ python3 main.py 5
+  ```
+🔄 If you also have results for [_delta-lstm, cstate_only, seq_leap, seq_only_], you can get the results for all prefetchers by running exec.sh
+```bash
+$ ./exec.sh
+```
+ 
