@@ -1,7 +1,7 @@
 # cLSTM Prefetcher
 
 ### ⚙️ Environment Setting
-
+_Language :_ Python 3.9.21
 ```bash
 $ pip install -r requirements.txt
 ```
