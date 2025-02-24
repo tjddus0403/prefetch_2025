@@ -18,6 +18,14 @@ def get_pf(choice, conf):
         prefetcher = pf.BestOffsetPrefetcher()
     elif choice == PF_RA:
         prefetcher = pf.LinuxReadAhead()
+    elif choice == PF_ONLYC:
+        prefetcher = pf.OnlyCstateOrSeq(conf.only_clstm_result)
+    elif choice == PF_ONLYS:
+        prefetcher = pf.OnlyCstateOrSeq(conf.only_seq_result)
+    elif choice == PF_DELTA:
+        prefetcher = pf.DeltaLSTM(conf.delta_result)
+    elif choice == PF_SEQ:
+        prefetcher = pf.SeqPrefetcher(conf.seq_result)
     else:
         print("Wrong choice for prefetcher")
         sys.exit()

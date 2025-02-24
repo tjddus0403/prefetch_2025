@@ -145,6 +145,23 @@ class CLSTMPrefetcher:
         self.num += 1
         return fetched_data
     
+class SeqPrefetcher:
+    def __init__(self, file_path):
+        self.code = SEQ
+        self.leap = LeapPrefetcher()
+        self.result = pd.read_csv(file_path)
+        self.result['pred'] = self.result['pred'].apply(self.str_to_list)
+        # print(self.result.index)
+        self.num = 0
+
+    def str_to_list(self, strlist):
+        return literal_eval(strlist)
+
+    def prefetch(self, lpn: int):
+        fetched_data = self.result['pred'][self.num]
+        self.num += 1
+        return fetched_data
+    
 class BestOffsetPrefetcher:
     def __init__(self, k = 16):
         self.code = BO
@@ -268,4 +285,37 @@ class LinuxReadAhead:
             for i in range(1, self.aggressiveness+1):
                 fetched_data.append(lpn+i)
         
+        return fetched_data
+    
+class OnlyCstateOrSeq:
+    def __init__(self, file_path):
+        self.code = ONLY
+        self.result = pd.read_csv(file_path)
+        self.result['pred'] = self.result['pred'].apply(self.str_to_list)
+        # print(self.result.index)
+        self.num = 0
+
+    def str_to_list(self, strlist):
+        return literal_eval(strlist)
+
+    def prefetch(self, lpn: int):
+        fetched_data = self.result['pred'][self.num]
+        self.num += 1
+        return fetched_data
+    
+class DeltaLSTM:
+    def __init__(self, file_path):
+        self.code = DELTA
+        self.leap = LeapPrefetcher()
+        self.result = pd.read_csv(file_path)
+        self.result['pred'] = self.result['pred'].apply(self.str_to_list)
+        # print(self.result.index)
+        self.num = 0
+
+    def str_to_list(self, strlist):
+        return literal_eval(strlist)
+
+    def prefetch(self, lpn: int):
+        fetched_data = self.result['pred'][self.num]
+        self.num += 1
         return fetched_data

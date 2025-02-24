@@ -22,6 +22,8 @@ class Cache:
 
 class LRUCache(Cache):
     def __init__(self, capacity: int, unit, pf, conf):
+        if pf.code == NONE:
+            capacity = capacity + int(capacity * 0.2)
         super().__init__(capacity, unit, conf)
 
         # cached data
@@ -32,13 +34,34 @@ class LRUCache(Cache):
         self.pf = pf
         # self.pf_n = pf.aggressiveness
         self.pf_buff = []       # prefetced data list
-        self.pf_buff_slots = int(self.slots * 0.2)
+        if self.pf.code == NONE:
+            self.pf_buff_slots = 0
+        else:
+            self.pf_buff_slots = int(self.slots * 0.2)
         # print("prefetch buffer slots :", self.pf_buff_slots)
         self.pf_hits = 0
+
+        # # bitmap
+        # self.bitmap = {}
+        # self.touched_list = []
+
+        # # distance
+        # self.distance = []
+        # self.pf_hit_distance = []
+        # self.pf_miss_distance = []
+        # self.miss_lpn = []
+        # self.closest_rank = []
+        # self.miss_closest_rank = []
 
         # precision
         self.total_pf = 0
         self.pf_buf_evicted = 0
+
+        # delta
+        self.prev_lpn = 0
+
+        # for data collection
+        self.collect = conf.collect
 
     def reset(self):
         self.hits = 0
@@ -49,6 +72,13 @@ class LRUCache(Cache):
         
         self.pf_buff.clear()
         self.pf_hits = 0
+
+        # self.distance.clear()
+        # self.pf_hit_distance.clear()
+        # self.pf_miss_distance.clear()
+        # self.miss_lpn.clear()
+        # self.closest_rank.clear()
+        # self.miss_closest_rank.clear()
 
         # precision
         self.total_pf = 0
@@ -64,8 +94,10 @@ class LRUCache(Cache):
             \nhit_ratio_pf = {(self.hits+self.pf_hits)/self.refs}"
         print(stat)
         if self.pf.code != NONE:
-            precision = self.pf_buf_evicted/self.total_pf
-            print(f"precision = {precision:.4f}")
+            print("total_pf =", self.total_pf)
+            print("miss_pf =", self.pf_buf_evicted)
+            no_used_eviction_rate = self.pf_buf_evicted/self.total_pf
+            print(f"no_used_eviction_rate = {no_used_eviction_rate:.4f}")
         return
     
     def access(self, addr):
@@ -80,8 +112,23 @@ class LRUCache(Cache):
         if self.pf.code == BO:
             self.pf.learn(lpn)
 
-        # clstm
-        if self.pf.code == CLSTM:
+        # delta
+        if self.pf.code == DELTA:
+            delta_result = self.pf.prefetch(int(lpn))
+            # precision
+            self.total_pf += len(delta_result)
+            for delta_pd in delta_result:
+                if delta_pd == '<UNK>' : continue
+                pd = self.prev_lpn + int(delta_pd)
+                if pd not in self.pf_buff and pd not in self.dlist:
+                    self.pf_buff.append(pd)
+                if len(self.pf_buff) > self.pf_buff_slots:
+                    self.pf_buff.pop(0) # FIFO
+                    # precision
+                    self.pf_buf_evicted += 1
+
+        # clstm or seq + leap
+        if self.pf.code == CLSTM or self.pf.code == SEQ or self.pf.code == ONLY:
             pf_clstm = self.pf.prefetch(int(lpn))
             # precision
             self.total_pf += len(pf_clstm)
@@ -118,6 +165,7 @@ class LRUCache(Cache):
                 else:
                     self.pf.readaheadOff()
 
+        self.prev_lpn = lpn
         # hit
         if lpn in self.dlist:
             self.dlist.remove(lpn)
@@ -149,6 +197,7 @@ class LRUCache(Cache):
                     # dlist, pf_buff 모두 miss일 때 hit counter = 0
                     self.pf.hit_counter = 0
 
+            # self.miss_lpn.append(lpn)
             # replacement
             if len(self.dlist) == self.slots :
                 evicted_lpn = self.dlist.pop(-1)
@@ -164,16 +213,17 @@ class LRUCache(Cache):
             if self.pf.code == RA:
                 self.pf.prev_page = lpn
             
-            if self.pf.code == CLSTM:
+            if self.pf.code == CLSTM or self.pf.code == SEQ or self.pf.code == DELTA:
                 self.pf.leap.history_insert(lpn)
                 self.pf.leap.find_offset()
                 self.pf.leap.set_aggressiveness(self.pf_hits)
                 pf_data = self.pf.leap.prefetch(int(lpn))
 
             else:
-                pf_data = self.pf.prefetch(int(lpn))
+                if self.pf.code != ONLY:
+                    pf_data = self.pf.prefetch(int(lpn))
 
-            if self.pf.code != NONE :
+            if self.pf.code != NONE and self.pf.code != ONLY:
                 # precision
                 self.total_pf += len(pf_data)
                 for pd in pf_data:

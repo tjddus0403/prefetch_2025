@@ -29,7 +29,7 @@ def idx2addr(result_idx):
     result_idx['pred'] = result_idx['pred'].apply(str_to_list)
     result_idx['pred'] = result_idx['pred'].apply(idx_to_toklist)
     result_idx['target'] = result_idx['target'].apply(idx_to_tok)
-    result_idx.to_csv(f"./results/{trace}_test_result_addr.csv", index=False)
+    result_idx.to_csv(f"./results/clstm_leap/{trace}_test_result_addr.csv", index=False)
 
 def test(dataset, model):
     result_df = pd.DataFrame()
