@@ -1,4 +1,6 @@
 # cLSTM Prefetcher
+[project_proposal.pdf](https://github.com/user-attachments/files/19085031/_20201786.-1.pdf)
+
 
 ### ⚙️ Environment Setting
 _Language :_ Python 3.9.21
