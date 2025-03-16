@@ -31,7 +31,7 @@ pip install -r requirements.txt
   ./split_data.sh
   ```
 ***
-### 🗂️ Data Collection (아직 미완성)
+### 🗂️ Data Collection
 Use the simulator to generate training data for the model
 
 0. Create directories for data collection
